@@ -69,4 +69,135 @@ Sistema gestor de bases de datos.
 
     Esquema conceptual: Tiene la descripción de
 
-    (Revisar presentación después)
+    (Revisar presentación después) (se me ha olvidado)
+
+## Modelo relacional
+
+Informálmente cada relación en el modelo relacionar se puede visualizar como
+una tabla, de forma que cada fila sería una colección de datos que tienen
+relación entre ellos. El nombre de la tabla y de las columnas sirve para
+interpretar el significado de los valores. Todos los valores de la misma
+columna son de la misma clase.
+
+- Fila <-> Tupla
+- Columna <-> Atributo
+- Tabla <-> Relación
+
+Una relación se compone de un esquema de esta (cabecera) y el contenido de
+esta.
+
+El esquema se compone del nombre de este y el conjunto de atributos.
+
+Un atributo es el rol que ejerce un dominio en un esquema.
+
+El dominio es el conjunto de valores del mismo tipo.
+
+Dominios:
+
+- Texto:
+    - Char(x) // Espacio fijo de chars
+    - Varchar(x) // Espacio de chars que se libera lo no usado al hacer el
+      commit
+- Números:
+    - Int
+    - Bigint
+    - Tinyint
+- Booleanos
+- Timestamp
+    Guarda la cantidad de segundos que han pasado desde el 01/01/1970 00:00
+- Null
+    En caso de no conocer el valor que se quiere guardar se usa NULL
+
+La extensión de una relación es un conjunto de tuplas donde cualquiero elemento
+es un valor del dominio de este esquema o un valor nulo. Una tupla es un
+elemento de la extensión de esta relación.
+
+La cardinalidad es la cantidad de tuplas de la extensión y el grado el número
+de atributos.
+
+Una superclave es un subconjunto de atributos que permiten identificar cada
+tupla.
+
+Ejemplo: 
+
+```
+EMPLEADO: (DNI, NSS, Nombre, Teléfono, Sueldo)
+
+Superclaves:
+
+{DNI, NSS, Nombre, Teléfono, Sou}
+{DNI, Nombre}
+{DNI}
+etc.
+
+```
+
+La clave es el conjunto mínimo que sea superclave.
+
+La clave primaria es aquel valor que se usa como identificador dentro de la
+base de datos, declarado como `UNIQUE` en la definición de la tabla.
+
+Una clave alternativa es una clave no designada como primaria.
+
+/!\ Se subrallan los atributos que forman la clave primaria.
+
+### Operaciones
+
+Las operaciones del modelo relacional deben permitir manipular los datos
+almacenados en la base de datos.
+
+#### Actualización
+
+- Insertar tuplas
+- Borrar tuplas
+- Modificar tuplas
+
+#### Consulta
+
+Obtener los datos deducibles a partir de las relaciones.
+
+---
+
+### Reglas de integridad
+
+#### Regla de indentidad
+
+Todos los atributos de la clave primaria deben ser únicos dentro de los valores
+de la relación, es decir, no se puede repetir ese valor y, además, no puede ser
+nulo.
+
+#### Regla de dominio
+
+Un valor no nulo debe pertenecer al dominio del atributo.
+
+#### Regla de referencialidad
+
+Ayuda a definir las relaciones entre tablas.
+
+En la situación que pase esto, por ejemplo:
+
+```
+DEPARTAMENTOS(Nombre)
+		Producción
+		Ventas
+
+EMPLEADOS(DNI; Departamento)
+		4043904390	Producción
+		4839058096	Producción
+		6546984694	Ventas
+		2958340583	NULL
+		3455396504	Marketing	// Este no puede existir por no
+						// estar Marketing en los
+						// departamentos
+```
+
+Al momento de modificar un elemento de la relación DEPARTAMENTOS del ejemplo
+anterior hay varias reglas que pueden ejecutarse y que se definen al crear la
+tabla pero usando un ALTERN TABLE ...:
+
+- RESTRICT
+    No permite la modificación si este dato está referenciado en otra tabla.
+- CASCADE
+    Si se cambia el nombre o se elimina se hace la misma acción en cascada en
+    cualquier otra tambla donde esté referenciado el elemento.
+
