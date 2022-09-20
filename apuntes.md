@@ -109,8 +109,6 @@ Dominios:
     En caso de no conocer el valor que se quiere guardar se usa NULL
 
 La extensión de una relación es un conjunto de tuplas donde cualquiero elemento
-es un valor del dominio de este esquema o un valor nulo. Una tupla es un
-elemento de la extensión de esta relación.
 
 La cardinalidad es la cantidad de tuplas de la extensión y el grado el número
 de atributos.
@@ -198,6 +196,40 @@ tabla pero usando un ALTERN TABLE ...:
 - RESTRICT
     No permite la modificación si este dato está referenciado en otra tabla.
 - CASCADE
-    Si se cambia el nombre o se elimina se hace la misma acción en cascada en
+    Si se cambia el nombre o se elimina se hace la++ misma acción en cascada en
     cualquier otra tambla donde esté referenciado el elemento.
+
+## Componentes lógicos
+
+### Esquemas
+
+Se agrupa los comnentes de datos (tablas, vistas, etc.) y los componentes de
+control (procedimientos, disparadores, etc.). Permite la gestión más simple de
+la base de datos con el esquema de información.
+
+### Conexiones, sesiones y transacciones
+
+Una conexión se puede definir como la asociación entre un cliente SQL y un
+servidor SQL cuando el cliente manifiesta la intención de trabajar con la base
+de datos.
+
+```SQL
+CONNECT TO nombre_servidor [AS nombre_conexión] [USER identificador_usuario]
+SET_SCHEMA esquema
+```
+
+(Mirar temario)
+
+Las restricciones solo se comprobarán en caso de que la tabla tengan datos.
+
+#### Aserciones
+
+Restricciones de integridad que afectan a más de una tabla. A diferencia de las
+restricciones de columna o de tabla se comprieban siempre. No se pueden definir
+en la matoría de los sistemas actuales, de forma que hay que usar otros
+mecanismos: los disparadores.
+
+```SQL
+CREATE ASSERTION nombre CHECK (condición);
+```
 
