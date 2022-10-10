@@ -233,3 +233,140 @@ mecanismos: los disparadores.
 CREATE ASSERTION nombre CHECK (condición);
 ```
 
+Ejemplo:
+
+```SQL
+CREATE ASSERTION foo CHECK(
+    (SELECT val FROM (1)) = (SELECT val FROM (2))
+    )
+```
+
+Ejercicios
+
+1.- Mío
+```SQL
+CREATE ASSERTION foo CHECK(
+    NOT EXISTS(SELECT * from categorias c, empleats e WHERE e.categoria =
+    c.categoria and e.sou < c.soumínim)
+    );
+```
+
+1.- Profesor
+```SQL
+CREATE ASSERTION foo CHECK(
+    NOT EXISTS(SELECT * from empleats e JOIN categories c ON e.categoria =
+    c.categoria WHERE e.sou < c.soumínim)
+    );
+```
+2.-
+```SQL
+CREATE ASSERTION bar CHECK(
+    (SELECT COUNT(*) FROM Empleats_adm) <= (SELECT COUNT(*) FROM Empleats_prod)
+	);
+```
+
+### Vistas
+
+Permite guardar queries como un proceso que se ejecuta, de forma que en lugar
+de ejecutar un `select` enorme se usar un `select` únicamente de la vista.
+
+```SQL
+CREATE VIEW empate AS (
+    SELECT *
+    FROM partits
+    where golsElocal = golsevisitant
+	) WHITH CHECK OPTION;
+```
+
+### Privilegios
+
+Un privilegio es un rol/usuario que permite realizar ciertas operaciones sobre
+algún objeto del esquema. Se asignan usando `GRANT` y para eliminarlos usando
+`REVOKE`. Tener permisos de admin es dar la totalidad del control de la base de
+datos a ese usuario.
+
+Se definen 9 privilegios:
+
+- Select
+- Insert
+- Update
+- Delete
+
+Permite acceder a ciertas tablas e incluso a ciertas columnas de la tabla
+limitando el acceso.
+
+- References
+    Privilegio de crear nuvas claves ajenas y referencias
+- Usage
+    Permite utilizar otros objetos
+- Trigger
+    Definir disparadores
+- Execute
+    Derecho a ejecutar piezas de código como pueden ser los procedimientos
+- Under
+    Crear subtipos
+- All
+    Todo
+
+Cuando un usuario crea un esquema se identifica con la cláusula `AUTHORIZATION`
+y tiene todos los privilegios sobre este. Será inaccesible para cualquier
+usuario a menos que sea añadido con la cláusula `GRANT`. Si se añade `WITH
+GRANT OPTION` se permite que este usuario le dé permisos a otros más.
+
+A la hora de revocar los permisos a algún usuario añadiendo `CASCADE` se
+eliminan también los permisos que este usuario ha dado. Usando `RESTRICT` se
+evita que en caso de que `CASCADE` fuera a eliminar algo más se haga.
+
+### Cosa importante: Ley Orgánica de Protección de Datos personales (LOPD)
+
+Ley orgánica 15/1999
+Real decreto 994/1999
+
+Modificado en el BOU 55/2011 para redefinir los niveles de gravedad de las
+infracciones y cambios en las sanciones.
+
+Ley catalana 32/2010
+
+Se creó un nuevo reglamento de la UE del 27 de abril al 2016 que entró en vigor
+el 25 de mayo de 2018. General Data Protection Regulation (GDPR).
+
+Se aplica a cualquier organización registrada en la UE o con sede en la UE o
+que procesa datos peronales de ciudadanos europeos.
+
+Qué son datos personales?
+
+- Nombre
+- Correo
+- Dirección
+- Identificadores como DNI
+- Localización
+- IP
+- Cookies
+- RFID
+- Salug
+- Genética
+- Datks biométricos
+- Datos raciales o étnicos
+- Opiniones políticas
+- etc.
+
+Lo que hay que hacer es guardar los datos encriptados, se tienen que comprobar
+y evaluar las políticas de seguridad, se tiene que grantizar la
+confidencialidad, intefrodad, disponibilidad y resiliencia de los sistemas, se
+tiene que dotar a la organización con los recursos necesarios para devolver la
+disponibilidad y acceso a los datos e ncaso de incidencia física o técnica en
+un tiempo razonable.
+
+Se debe de garantizar:
+
+- Obtener consentimiento de manera clara y sencilla y obtener baja
+- Notificar a tiempo una fuga de datos.
+- Derecho al acceso a una copoa gratuita de los datos de un usuario cuando se
+  pida.
+- Derecho al olvido de los datos del servidor, pudiendo pedir la eliminación de
+  todos los datos de un usuario.
+- Portabilidad de los datos a otra organización si el usuario lo pide.
+- Privacidad implícita en el diseño del sistema.
+- Data Protection Officer en caso de que la empresa cumpla ciertos requisitos.
+
+Para mirar multas por GDPR [enformcementtracker.com](www.enforcementtracker.com)
