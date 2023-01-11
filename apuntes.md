@@ -403,6 +403,275 @@ Se debe de garantizar:
 
 Para mirar multas por GDPR [enformcementtracker.com](www.enforcementtracker.com)
 
+## Procedimientos en PL/pgSQL
+
+PL/pgSQL es un lenguaje que ofrece PostfreSQL para implementar procesos
+almacenados en la base de datos. Estas sentencias de iusan dentro del cuerpo
+del procedimiento, es decir, entre las sentencias `CREATE FUNCTION` y `END` de
+esta función.
+
+El lenguaje ofrece dos tipos de sentencias:
+
+- Sentencias `DECLARE` para definir y asignar valores a variables.
+
+- Sentencias de control de flujo como los `IF`, `LOOP`, `FOR`, `WHILE`,
+  `EXCEPTION`  y `RAISE EXCEPTION`.
+
+Estas funciones cuando se llaman pueden devolver valores, tanto uno único como
+un conjunto de estos. Esto se declara al momento de crear la función en la
+sentencia `CREATE FUNCTION` donde, después de darle el nombre a la función y
+marcar los parámetros de entrada con su tipo (primero el nombre y después el
+tipo) se escribe un `RETURNS` y después de esto el tipo del dato que se
+devuelve. En caso de no devolver nada el tipo que se devuelve tiene que estar
+marcado como `void`. En caso de devolver múltiples datos después del `RETURNS`
+y antes del tipo del dato que se devuelve se tiene que escribir un `SETOF`, de
+forma que queda un `RETURNS SETOF`.
+
+Para devolver los valores se usa `RETURN` y en caso de estar en una función
+declarada con un `RETURNS SETOF` habrá que usar un `RETURN NEXT`. En caso de
+que se esté devolviendo un conjutno de tuplas y no una sola si se ejecuta un
+`RETURN` sin el `NEXT` se interpreta como el final del procedimiento. Esto
+también se interpreta en caso de llegar al final de este.
+
+### Variables
+
+Las variables al almacenarse en memoria volátil no son consideradas objetos de
+la base de datos, además qiue son locales del procedimiento en el que han sido
+declaradas. El tipo de la variable se puede declarar tanto de forma explícita
+como enlazándola al tipo de datos de una determinada columna de una tabla a
+partir de la cláusula `TYPE`
+
+Estas variables se pueden usar dentro de sentencias SQL o dentro de sentencias
+de PL/pgSQL para asignar valores dentro de estas, calcular valores o controlar
+el flujo de ejecución de un procedimiento.
+
+Además en algunos casos puede venir bien definir nuevos tipos de datos como si
+fueran un `struct` de C. con la sentencia `CREATE TYPE (nombre) as (...);` esto
+permite que a la hora de devolver datos de un procedimiento se puede hacer con
+un conjunto de distintos tipos de datos.
+
+Para asignar valores a las variables se puede hacer con una sentencia de
+asignación del propio lenguaje que tiene la sintaxis `(nombre) := (valor);`,
+con una sentencia `SELECT ... INTO` o asignando la variable del retorno de otro
+procedimiento usando cualquiera de los dos métodos antes mencionados.
+
+## Condicionales
+
+Los condicionales en PL/pgSQL tienen la sintaxis siguiente
+
+```SQL
+IF condición THEN
+	...
+ELSEIF condición THEN
+	...
+ELSE
+	...
+END IF;
+```
+
+Además dentro de cada procedimiento hay una variable implícita a este que es
+`FOUND`. Esta en un principio tiene como valor False. Se pone a True en una
+sentencia `SELECT ... INTO` si esta ha obtenido una fila o False si no. En un
+sentencia `UPDATE`, `INSERT` o `DELETE` se pone a True si se ha modificado una
+fila como mínimo o a False si no. En una sentencia `FOR` se pone a True al
+acabar si se ha iterado mínimo una vez, si no se pone a False.
+
+## Sentencias iterativas
+
+La sentencia `FOR` se usa para iterar sobre un conjunto de tuplas recibidas por
+una consulta SQL con un
+
+```SQL
+FOR target IN query
+LOOP
+	...
+END LOOP;
+```
+
+Y también para iterar si se sabe a priori el número de iteraciones:
+
+```SQL
+FOR name IN expression .. expression
+LOOP
+	...
+END LOOP;
+```
+
+Las sentencias `WHILE` y `LOOP` se usan para definir bucles para cuando su
+terminación depende de una expresión condicional, usándose de la siguiente
+forma:
+
+```SQL
+LOOP
+	...
+	EXIT WHEN expression;
+	...
+END LOOP;
+```
+
+```SQL
+WHILE expression
+LOOP 
+	...
+END LOOP;
+```
+
+### Manejo de errores
+
+Con la sentencia `RAISE EXCEPTION` se puede lanzar una excepción dentro del
+código del procedimiento y se pueden no tratar, provocando la interrupción del
+código o tratarlas dentro del bloque `EXCEPTION` usando el conjunto de
+sentencias
+
+```SQL
+	EXCEPTION
+		WHEN raise_exception THEN
+			tratamiento
+		WHEN más_excepciones THEN
+			tratamiento
+		WHEN OTHERS THEN
+			tratamiento
+```
+
+## Triggers
+
+Un trigger es una sentencia que se ejecuta  en una situación determinada y que
+hace que se trate un procedimiento.
+
+Se declaran con la siguiente sintáxis:
+
+`CREATE TRIGGER nombre {BEFORE | AFTER} {suceso [OR ...]} ON tabla [FOR [EACH] {ROW | STATEMENT}] EXECUTE PROCEDURE función`
+
+De esta manera se pueden definir 4 casos por orden de ejecución y visibilidad
+de datos:
+
+1. `BEFORE STATEMENT`
+	La acción se ejecuta 1 vez antes de la ejecución de la sentencia que
+	ejecuta el trigger
+
+2. `BEFORE ROW`
+	la acción se ejecuta 1 vez antes de cada cambio de fila.
+
+3. `AFTER STATEMENT`
+	La acción se ejecuta 1 vez al final de la ejecución de la sentencia y
+	con los valores cambiados.
+
+4. `AFTER ROW`
+	La acción se ejecuta 1 vez después de cada cambio de fila.
+
+El procedimiento que se usa para los triggers no recibe ningún parámetro y
+tiene que devolver un tipo `trigger`, de forma que el `RETURN` es sí o sí o
+`NULL`, `NEW` u `OLD`.
+
+De esta forma tenemos diferentes variables a las que podemos acceder dentro de
+los procedimientos: `TG_OP` contiene el nombre de la sentencia que ha lanzado
+el trigger. También están `NEW` y `OLD` que tienen valor para sentencias `FOR
+EACH ROW` y son `NULL` para sentencia `FOR EACH STATEMENT`. De esta forma `NEW`
+contiene el valor que se asigna y no tiene valor en sentencias `DELETE`. `OLD`
+contiene el valor de la fila previo a la asignación y no tiene valor en
+sentencias `INSERT`.
+
+Con las variables `NEW` y `OLD` se tiene el control del resultado del trigger a
+partir del `RETURN`, de forma que si se devuelve `NEW` se indica que el
+procedimiento tiene que acabar normalmente y que la operación que dispara el
+disparador se tiene que ejecutar. Si se modifica el valor de la variable NEW se
+está modificando el valor que se va a colocar en la tabla con la ejecución de
+esa sentencia. Si se devuelve `OLD` se indica la ejecución del procedimiento
+para la fila actual y que la operación se tiene que ejecutar. En las sentencias
+`UPDATE` si se devuelve `OLD` se indica que no se hace la modificación en la
+tabla. En caso de devolver `NULL` se indica que la ejecución del procedimiento
+tiene que acabar sin errores pero que la operación no se ejecuta.
+
+Todo lo anteriormente dicho solo se puede hacer en sentencias `BEFORE ROW`, en
+el resto el valor de retorno es ignorado y, por tanto, es mejor usar un `RETURN
+NULL`.
+
+La cosa es que en disparadores `BEFORE` se ejecuta este antes de la operación y
+comprobar las restricciones. En los disparadores `AFTER` se hace después de
+ejecutar la operacioón y comprobar las restricciones.
+
+Para actualizar vistas se usa un trigger `INSTEAD OF`.
+
+## Programación usando SQL
+
+JDBC es una API que define los métodos para conectarse y acceder a bases de
+datos remotas dentro de un programa escrito en Java. Estos métodos se
+implementan en driver específicos para cada SGBD, siendo estos drivers un
+conjunto de librerías que dependen del SGBD que implementan los métodos
+definidos en la API. Hay dos tipos de drivers, los que son un puente a un
+driver ODBC, teniendo que ser este específico para el SGBD al que se quiere
+aceder y el otro tipo es el driver JDBC con una librería de implementación
+proporcionada por el fabricante del SGBD. También están los drivers que
+traducen a un protocolo del red que permite la comunicación con la base de
+datos y, por último está el driver JDBC puero que da acceso al SGBD y es
+específico de este.
+
+Para registrar los drivers hay que usar `Class.forName("nombre");`. Después hay
+que especficar ciertas propiedades como el nombre de usuario y la contraseña de
+la siguiente forma:
+
+```Java
+Properties props = new Properties();
+props.setProperty("user", "username");
+props.setProperty("password", "password");
+```
+
+
+Después de esto hay que definir la conexión de la siguiente forma:
+
+```Java
+Connection c = DriverManager.getConnection("url", props);
+```
+
+Está la opción de decidir si activar o no el autocommit, que hace que al acabar
+cada sentencia se ejecute un commit y no sea necesario ponerlo a mano. Esto se
+hace con la sentencia `c.setAutoCommit(boolean)`, siendo `c` la clase
+`Connection`. Para seleccionar el esquema hay que ejecutar la sentencia SQL
+`SET SCHEMA nombre`
+
+Para comunicarse con la base de datos se usan tanto `Statement` que compila la
+sentencia SQL a cada ejecución y viene bien si se ejecuta esta pocas veces y
+los `PreparedStatement` que se precompilan y permiten modificar ciertos datos
+de estas pero aceleran la ejecución del código, por lo que es preferible
+usarlos en casos donde la sentencia se vaya a ejecutar múltiples veces como
+puede ser en un bucle.
+
+Un `Statement` se declara usando la función `createStatement()` y se añade la
+consulta con un `ResultSet executeQuery(String sql)`/`int executeUpdate(String
+sql)`. En cambio con los `PreparedStatement` se declaran con
+`prepareStatement(String sql)` y la ejecución se produce con `ResultSet
+executeQuery()`/`int executeUpdate()`.
+
+En los `PreparedStatement` los parámetros se especifican con un signo `?`
+dentro del String que forma la sentencia. Para darle valores a estos parámetros
+se usan los métodos `setString`, `setInt`, `setNull`.
+
+Una vez que se tiene el resultado en un `ResultSet` con el método `next()` se
+avanza a la siguiente fila que devuelve `true` en caso de que haya podido. Para
+recibir los datos se usa el método `getXXX` con un int en caso de querer
+acceder por la posición o con un Strign para acceder a partir del nombre de la
+columna. Estos valores si se tratan de clases de Java se puede comprobara si
+son `NULL` comparando con un `== null`. En caso de que no lo sea habría que
+usar el método `wasNull()` de la clase `ResultSet`.
+
+Una vez que s eha acabado el procesamiento de un `Statement` o un
+`PreparedStatement` se tiene que cerrar usando el método `close()`, al igual
+que con un `ResultSet`.
+
+Una vez hechas todas las sentencias hay que cerrar la conexión haciendo antes
+un `commit` o `rollback` usando los métodos con es enombre y finalmente
+cerrar.
+
+El manejo de excepciones se hace usando un `try-catch` y para obtener la
+información del error en Java para tener el código de estado de SQL hay que
+usar el método `getSQLState()` que en caso de dar `00000` es que todo ha ido
+bien, `01XXX` si hay un aviso y >`02XXX` si hay un error grave que impide la
+ejecución.
+
+
+
+
+
 ## Diseño de bases de datos relacionales
 
 EL diseño de una bas de datos relacional consiste en definir la estructura de
@@ -501,3 +770,389 @@ todos los atributos han de ser univalorados. En caso de que alguno de estos
 requisitos no se cumpla hay que transformar el modelo de forma que se cumpla
 añadiendo atributos con restricciones de clave externa y/o transformando los
 atributos multivalorados en asociaciones.
+
+#### Clase de objetos
+
+De esta manera cada clase de objetos se transforma en una relación, de forma
+que la clave primaria será la clave externa de la clase de objeos y los
+atributos de la relación serán los atributos de la clase de objetos.
+
+#### Asociaciones binarias
+
+##### Caso uno a muchos
+
+La multiplicidad 0..1 o 1 en un extremo y * en el otro se tranforma en añadir
+una clave externa a la relación que corresponde a la clase del extremo de
+muchos de la asociación  y referenciar a la otra de la relación.
+
+##### Claso uno a uno
+
+A diferencia del anterior la referencia de un atributo de una clase a otroa
+pude ser de cualquiera de una a la otra.
+
+##### Caso muchos a muchos
+
+En este caso donde la multiplicidad es * en ambos casos se tranforma definiendo
+una nueva relación donde la clave primaria estará formada por los atributos de
+la clave primaria de las relaciones corresponidentes a las clases de los dos
+extremos de la asociación.
+
+#### Asociaciones n-árias
+
+Las asociaciones n-árias se transforman en una nueva relación que contiene los
+atributos que forman la clave de las clases asociadas. Si todas las clases
+están conectadas con * la clave primaria estará formada por todos los atributos
+que forman las claves de las clases asociadas. Si, en cambio, las clases están
+conectadas con un 1 la clave primaria de la nueva relación estará formada por
+las claves de las clases excepto esta ya que solo habría un valor de esta y no
+sería necesaria para identificar al objeto.
+
+#### Asociaciones recursivas
+
+Las asociaciones recursivas se transforman igla que el resto de asociaciones,
+teniendo en cuenta si son binarias o n-arias, además de su multiplicidad y
+aplicando las transformaciones correspondientes.
+
+#### Transformaciones de clases asociativas
+
+La transformación de la asociación es a la vez la transformación de la clase
+asociativas, de forma que si la clase asociativa tiene atributos estos se
+agregan como atributos de la relación correspondiente a la transformación.
+
+#### Transformación de la generalización/especialización
+
+Cada una de las clases de objetos que forman parte de una generalización se
+transforma en una relación donde la relación correspondiente a la superclase
+tiene como clave primaria la clave de la superclase y contiene todos los
+atributos de esta y las relaciones correspondientes a las subclases tienen como
+clave primaria la clave de la superclase y contienen los atributos específicos
+de la subclase.
+
+## Transacciones
+
+Las transacciones cumplen las propiedades ACID:
+
+- Atomicidad: Se ejecuta o todo o nada.
+- Consistencia: Todos los datos deben cumplir ciertas condiciones tanto antes
+  como después de las transacciones aunque en medio pueda no haber
+  consistencia.
+- Aislamiento: Las transacciones deben de ejecutarse como si estuvieran solas
+  de forma que no deben de haber errores en este acceso concurrente de los
+  datos.
+- Definitividad: 
+
+### Problemas del aislamiento
+
+Al tener transacciones que accedan a los mismos datos a la vez se pueden
+generar problemas en los que los datos puedan acabar siendo erróneos. Estos
+problemas tienen el nombre de interferencias.
+
+#### Actualización perdida
+
+Cuando dos transacciones se producen a la vez y una operación de escritura se
+pierde.
+
+#### Lectura no confirmada
+
+Se produce cuando una transacciones lee un dato que ha sido modificado por otra
+transacción que después es abortada o vuelve a modificar el dato.
+
+#### Lectura no repetible
+
+Se produce cuando una transacción lee dos veces el mismo dato pero se dan
+valores distintos porque entre medio de las dos lecturas otra transacción ha
+modificado el dato.
+
+#### Análisis inconsistente
+
+Cuando una actualización de datos se produce antes de su lectura pero después
+del inisio de la transacción desde otra distinta.
+
+#### Fantasmas
+
+Cuando una transacción lee primero unos datos y al volver a leer otros de la
+misma tabla aparecen datos nuevos debido a un insert o update de otra
+transacción.
+
+### Serializabilidad
+    
+Define de manera precisa las condiciones para considerar que las transacciones
+está aisladas entre sí de manera correcta.
+
+La serializabilidad considera que las transacciones está formadas por acciones
+que actúan sobre datos elementales llamados glánulos teniendo acciones de
+lectura (R(G), RU(G)) i escritura (W(G)), siendo G el gránulo,es decir, la
+unidad del dato controlado individualmente por el SGBD: página de disco,
+tub¡pla, etc.
+
+#### Operaciones
+
+Un `SELECT` de SQL se traduce en un `R(G)`. Los `INSERT`, `UPDATE` y `DELETE`
+se traducen en `RU(G)` que es una lectura con intención de modificación
+posterior del gránulo y `W(G)` que es en sí la escritura del gránulo.
+
+De esta maner,a la ejecución con currente de transacciones tiene el nombre de
+horario. Un horaro serial es aquel en el que no hay encabalgamiento entre
+transacciones. En horarios no seriales pueden hacer acciones conflictivas que
+son aquellas que operan sobre el mismo gránulo en distintas transacciones
+simultáneas.
+
+De esta forma se ve que hay horarios seriezable que son esos no seriales pero
+que las acciones conflictivas están colocadas de tal forma que no hay errores.
+
+#### Recuperabilidad
+
+Algunas interferencias se producen por la cancelaciónde una trnasacción. Esta
+cancelación supone deshacer todos los cambios y recuperar los valores
+anteriores del gránulo. Como la serializabilidad infonra la posibilidad de
+cancelaciones habrá que exigir nuevas condiciones a la ejecución de las
+transacciones, de forma que un horario cumple el criterio de recuperabilidad si
+niguna transacción que escribe o lee en un gránulo escrito por otra transacción
+confirma sin que antes lo haya hecho esta.
+
+Se pueden resolver las interferencias entre transacciones de dos formas
+distintas:
+
+- Cancelando automáticamente las transacciones problemáticas y deshaciendo los
+  cambios
+
+- Suspendiendo la ejecución temporalmente y reponiéndola cuando desparezca el
+  peligro de interferencia.
+
+Con esto se puede definir el nivel de paralelismo en base al trabajo efectivo
+realizado entre unidad de tiempo.
+
+Un SGBD puede controlar las concurrencias con un sistema de reservado de
+gránulos, puediend reservar de forma compartida (solo lectura) o exclusiva
+(lectura y escritura) con las acciones`LOCK(G, m)` y `UNLOCK(G)`. Aun así si se
+aborta una transacción se pueden seguir produciendo errores por lo que la
+reserva se tiene que mantener hasta el final de las transacciones.
+
+Si una de estas reservas no se puede conceder se suspende la ejecución de la
+transacción a la espera de la liberación del gránulo para ejecutarla.
+
+Aun así para conseguir el aislamiento de las transacciones estas tienen que
+seguir ciertas normas a la hora de pedir y liberar reservas, de forma que se
+tiene que seguir el protocolo de reserva en dos fasesque se produce si se
+reserva un gránulo en la modalidad adecuada  antes de operar y nunca adquiere
+una reserva de cualquier gránulo desde de liberar cualquier otro antes.
+
+Esto aun así produce una sobrecarga en el SBGD y una bajada del nivel de
+paralelismo. En determinadas operaciones es conveniente relajar el nivel de
+aislamiento en el caso de que se sepa que estas interferencias no se
+producirán o que no son importantes en caso de que sucedan.
+
+Se hace con la instrucción SQL
+
+```SQL
+SET TRANSACTION modo
+ISOLATION LEVEL nivel
+```
+
+Donde modo es `READ ONLY` o `READ WRITE` y nivel es `READ UNCOMMITTED`, `READ
+COMMITED`, `REPEATABLE READ` o `SERIALIZABLE`.
+
+- `READ UNCOMMITTED` protege los datos actualizados evitando una nueva
+  actualización hasta que acabe la transacción.
+
+  Reserva X hasta el final de la transacción sin reserva S para lectura.
+
+- `READ COMMITED` proteje temporalmente las lecturas impidiendo la lectura de
+  datos no confirmados.
+  
+  Rserva X hasta el final de la transacción y S hasta después de la lectura.
+
+- `REPEATEBLE READ` impide que una transacción actualice datos que se han
+  leídos desde otra.
+
+  Reservas X i S hasta el final de la transacción.
+
+- `SERIAZABLE` implide cualquier intereferencia
+
+  Todas las reservas hasta el final de las transacciones incluyendo de
+  información de control.
+
+El SGBD tiene que evitar los abrazos mortales usando una de tres posibilidades:
+
+- Prevenirlas antes de que sucedan.
+
+- Detectarlas y resolverlas cuando sucedam.
+
+- Definir un tiempo de espera máximo y cancelando la transacicón si se supera.
+
+Estos abrazos mortales se detectan buscando ciclos en el grafo de espera que se
+puede hacer siempre que una transacción pida una reserva y no la obtenga al
+momento, cada cierto tiempo o cuando tenermos transacciones que tardan mucho en
+acabar.
+
+Una vez que se detecta hay que romper el ciclo cancelando una o diversas
+transacciones.
+
+### Recuperación
+
+Se tiene que garantizar la atomicidad y definitividad de las transacciones, de
+forma que no s epueden perder los cambios efectuados por transacciones
+confirmadas y no se pueden guadar los de transacciones abortadas.
+
+Hay dos formas de recuperación:
+
+- Restauración: garantiza la atomicidad y definitividad antes cancelación de
+  transacciones y caídas del sistema
+
+- Reconstrucción: recuera el estado de la base de datos ante una pérdida total
+  o parcial de la información almacenada en el disco en caso de fallos o
+  desastres.
+
+La restauración se hace a partir de un log que guarda la información de los
+cambios pudiendo deshacer y rehacer.
+
+La reconstrucción se hace con una copia de seguridad y el log desde esta copia.
+
+## Almacenamiento y métodos de acceso
+
+Laas ventajas de la memoria externa sobre la interna es el bajo precio de esta
+en comparación con la interna, una capacidad virtualmente ilimitada y la no
+volatilidad de los datos al perder la corriente pero tiene la desventaja de ser
+mucho más lenta.
+
+### Componentes que ayudan a guardar los datos en el disco
+
+Estos componentes deben ser estándar.
+
+#### Nivel físico
+
+Los datos se almacenan en discos duros controlados por el sistema operativo que
+es quién ejecuta las lecturas y escrituras de los archivos aunque es el SGBD el
+que decide qué hay que leer específicamente.
+
+Estos datos están guardados en formato de páginas, siendo estas la medida
+estándar para controlar el guardado y lectura de datos con una estructura
+física de un tamaño determinado.
+
+Una página consiste en una cabecera (header) al inicio de la página y después
+filas de datos. Al final hay un vector de direcciones de las filas. Las filas
+están ordenadas en orden ascendente y el vector en orden descendente.
+
+
+Cada fila contiene una cabecera que tiene la información de la longitud de la
+fila y el identificador de la tabla a la que pertenece. Además contiene todos
+los campos de datos.
+
+Cada campo tiene también una cabecera que dice si el campo es NULL o NOT NULL y
+la longitud del campo. Si este campo es de una longitud fija y es NOT NULL no
+tiene cabecera.
+
+##### Gestión de la página
+
+Empieza formateando la página y hace una carga inicial de las filas, yendo la
+primera después de la cabecera la segunda después de la primera, etc. Esto
+siempre dejando un porcentaje del espacio libre.
+
+La carga posterior de una nueva fila empieza localizando la página en la que se
+va a guardar y se usa el espacio libre.
+
+La bajada de una fila libera el espacio ocupado y reorganiza internamente la
+página.
+
+El cambio de longitud de filas se comporta de diferentes maneras dependiendo
+del cambio: si disminuye se comporta de forma similar a la bajada de datos, si
+aumenta y el espacio es suficiente solo desplaza las filas de la página y en
+caso de que no tenga espacio se cambia el contenido de la fila por la nueva
+dirección de esta en una página donde quepa.
+
+### Métodos de acceso
+
+Siempre que s elee o actualiza una base de datos se hace a través de
+determinados métodos de acceso disponibles en el SGBD.
+
+#### Acceso por posición
+
+Permite acceder a una página con un número determinado y permite un acceso
+secuencial. Este acceso tiene cierto coste dependiendo de si se hace uno
+directo o secuencial. Un acceso directo tiene un coste de cargar una página del
+SO y uno secuencial tiene el coste del número N de páginas que se quiere
+acceder.
+
+#### Acceso por valor
+
+Permite un acceso directo a todas las filas con determinado valor y uno
+secuancial con las filas por el orden de los valores de un atributo.
+
+Para implementar estos accesos tanto por un valor como por múltiples hay que
+hacerlo a partir de estructuras de datos auxiliares llamadas índices que
+almacenan punteros a la información ordenados en base a determinados valores.
+
+Se implementan a partir de Árboles B⁺
+
+##### Árbol B⁺
+
+Es un árbol de de altura fija donde todos los nodos intermedios están
+representados en nodos inferiores.
+
+Hay dos tipos de nodos que son internos y hojas.
+
+EN un árbol de órden `d` los nodos contienen como mucho `2d` valores.
+
+Todos los nodos están ordenados en un orden creciente.
+
+Estos nodos internos tienen como objetivo dirigir la búsqueda de la información
+que está almacenada en los nodos hoja finales con los punteros a la
+información, además que los nodos hoja están conectados por punteros dobles
+para permitir el movimiento entre ellos.
+
+Cada nodo interno contiene valores y punteroa a los nodos hijos, teniendo estos
+valores ordenados en un orden creciente.
+
+Se puede mejorar el rendimiento de estos árboles teniendo todos los nodos
+excepto la raíz como mínimo en un 50%, por ejemplo: en un árbol de orden d debe
+de haber al menos d valores por nodo. Además todas las hojas tienen que estar
+al mismo nivel para que el nombre de nodos a recorrer sea siempre el mismo.
+
+El tamaño de los nodos depende del orden y el tamaño de los valores y punteros,
+de forma que si los nodos son muy grandes un árbol tendrá pocos niveles pero
+puede ser que tenga que hacer más de una operación I/O. En caso de que la raíz
+esté en memoria habrá que hacer un acceo menos.
+
+###### Índice agrupado
+
+Un índice agrupado es aquel en el que los datos que se indexan están ordenados
+físicamente en base al acceso secuencial por valor que proporciona este.
+
+---
+
+Para acceder mediante diversos valores se hace la estrategia de intersección
+pero que puede ser ineficiente para casos donde haya muchos que cumplan una
+condición y poco que la otra. De esta manera está la estrategia de índice
+multiatributo donde estos índes en lugar de tener un único valor serán listas
+de elementos que son estos multiatributos. Estos tienen una relación lineal en
+el ordenamiento, de forma que se ordena en base al primero elemento, dentro de
+estos por el segundo, ...
+
+### Coste de acceso
+
+#### Coste acceso secuencial por valor árbol B⁺ no agrupado
+
+El coste es el coste de acceso al índice + coste de acceso al fichero de datos
+= (h + F) + |R(a >= X)|
+
+h = altura, F = nodos hoja adicionales, |R(a>=X)| nombre de filas de la tabla R
+que cumplen la condición a >= X de la consulta.
+
+Este coste puede disminuir en 1 unidad si la raíz está en memoria.
+
+#### Coste acceso secuencial por valor árbol B⁺ agrupado
+
+El coste h + D, siendo h la altura del árbol y D = |R(a>=X)|/f siendo f el
+números de registros de la tabla por página (Tamaño de página / tamaño de
+registro)
+
+#### Coste de acceso directo por valor árbol B⁺ valores no repetidos
+
+Tiene un coste h + 1
+
+#### Coste acceso directo por valor árbol B⁺ no agrupado con posibilidad de
+valores repetidos
+
+Coste = (h + F) + |R(b=Y)|
+
+
